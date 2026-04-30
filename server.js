@@ -15,23 +15,18 @@ let usuarios = [];
 
 
 // ========== MIDDLEWARE DE AUTENTICACIÓN ==========
-function verificarToken(req, res, next) {
-    const authHeader = req.headers.authorization;
-
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ error: 'Token requerido' });
-    }
-    const token = authHeader.split(' ')[1];
+const verificarToken = (req, res, next) => {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.status(401).json({ error: 'Token requerido' });
 
     try {
-        const decoded = jwt.verify(token, process.env.JWT_ULTRA_SECRETO);
-        req.usuarioId = decoded.id;
-        req.usuarioRol = decoded.rol;
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        req.usuario = decoded; // Ahora cualquier ruta sabe quién es
         next();
-    } catch (error) {
+        } catch (error) {
         res.status(403).json({ error: 'Token inválido' });
     }
-}
+};
 
 
 
@@ -68,7 +63,7 @@ app.post('/api/auth/register', async (req, res) => {
     // Generar token
     const token = jwt.sign({
         id: nuevoUsuario.id, rol: nuevoUsuario.rol },
-        process.env.JWT_ULTRA_SECRETO,
+        process.env.JWT_SECRET,
         { expiresIn: '24h' }
     );
 
@@ -108,7 +103,7 @@ app.post('/api/auth/login', async (req, res) => {
 
         const token = jwt.sign(
             { id: usuario.id, rol: usuario.rol },
-            process.env.JWT_ULTRA_SECRETO,
+            process.env.JWT_SECRET,
             { expiresIn: '24h' }
         );
 
@@ -170,9 +165,18 @@ app.get('/', (req, res) => {
 });
 
 
-        // Iniciar servidor
+// Solo admins pueden crear torneos
+app.post('/api/torneos', verificarToken, (req, res) => {
+    if (req.usuario.rol !== 'admin') {
+        return res.status(403).json({ error: 'No autorizado' });
+    }
+    
+});
+
+
+// Iniciar servidor
 const PORT = 3000;
-    app.listen(PORT, () => {
+app.listen(PORT, () => {
     console.log(`Servidor en http://localhost:${PORT}`);
     console.log('isto para probar con Thunder Client');
 });
